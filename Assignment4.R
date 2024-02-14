@@ -1,27 +1,54 @@
 library(readr)
-library(dplyr)
 library(stringr)
+library(dplyr)
 
-# 获取当前工作目录中所有CSV文件的列表
-file_list <- list.files(pattern = "\\.csv$", full.names = TRUE)
+# 载入scientist_pub数据，假设文件位于当前工作目录
+scientist_pub <- read_csv("scientist_pub.csv") %>%
+  mutate(doi = toupper(doi), title = toupper(title), journal = 
+toupper(journal))
 
-# 为每个文件提取uniqueID并读取内容，然后将内容转化为大写
+# 获取当前工作目录下的Aminer子目录中的所有CSV文件
+files <- list.files(path = "Aminer", pattern = "\\.csv$", full.names = 
+TRUE, recursive = TRUE)
+
+# 定义一个函数来处理每个文件并计算准确率和召回率
 process_file <- function(file_path) {
-  # 从文件名中提炼出uniqueID
-  uniqueID <- str_extract(basename(file_path), "0_[0-9]+")
+  aminer_data <- read_csv(file_path) %>%
+    mutate(doi = toupper(doi), title = toupper(title), journal = 
+toupper(journal))
   
-  # 读取文件
-  data <- read_csv(file_path) %>%
-    mutate(across(c(doi, journal, title, year), str_to_upper), # 转换为大写
-           UniqueID = uniqueID) # 添加UniqueID列
+  # 提取 uniqueID
+  unique_ID <- str_extract(file_path, "0_[0-9]+")
   
-  return(data)
+  # 筛选scientist_pub中uniqueID对应的数据
+  scientist_pub_filtered <- filter(scientist_pub, uniqueID == unique_ID)
+  
+  # 筛选匹配的论文数据
+  matched_papers <- inner_join(aminer_data, scientist_pub_filtered, by = 
+c("doi", "title", "journal"))
+  
+  # 计算精准度和召回率
+  precision <- nrow(matched_papers) / nrow(aminer_data)
+  recall <- nrow(matched_papers) / nrow(scientist_pub_filtered)
+  
+  return(data.frame(file_name = basename(file_path), unique_ID, precision, 
+recall))
 }
 
-# 使用lapply处理所有文件并合并结果
-merged_data <- bind_rows(lapply(file_list, process_file))
+# 应用函数到每个文件
+results <- lapply(files, process_file)
 
-# 将合并后的数据写入新的CSV文件
-write_csv(merged_data, "merged_data.csv")
+# 合并结果
+final_results <- bind_rows(results)
 
-print(head(merged_data))
+# 保存结果到文件，文件保存在当前工作目录
+write_csv(final_results, "accuracy_recall_results.csv")
+
+# 计算整体准确率和召回率
+overall_precision <- mean(final_results$precision)
+overall_recall <- mean(final_results$recall)
+
+# 打印整体准确率和召回率
+print(paste("Overall Precision: ", overall_precision))
+print(paste("Overall Recall: ", overall_recall))
+
