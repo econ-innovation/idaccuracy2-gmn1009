@@ -2,12 +2,12 @@ library(readr)
 library(stringr)
 library(dplyr)
 
-# 载入scientist_pub数据，假设文件位于当前工作目录
+
 scientist_pub <- read_csv("scientist_pub.csv") %>%
   mutate(doi = toupper(doi), title = toupper(title), journal = 
 toupper(journal))
 
-# 获取当前工作目录下的Aminer子目录中的所有CSV文件
+
 files <- list.files(path = "Aminer", pattern = "\\.csv$", full.names = 
 TRUE, recursive = TRUE)
 
